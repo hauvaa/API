@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -24,7 +24,7 @@ def send_questions():
     <head><title>Answer the Questions</title></head>
     <body>
         <h1>Answer the Questions</h1>
-        <form action="/submit_answers/{{ session_id }}" method="POST">
+        <form id="answerForm" onsubmit="submitAnswers(event)">
     '''
 
     for q in questions:
@@ -50,9 +50,11 @@ def send_questions():
 def submit_answers(session_id):
     # Kiểm tra các giá trị gửi đến từ form
     answers = []
-    for key, value in request.form.items():
-        question_id = int(key.split("_")[1])  # Lấy id câu hỏi từ tên trường
-        answers.append({"id": question_id, "answer": value})
+    for key, value in request.json.items():
+        parts = key.split("_")
+        if len(parts) == 2:  # Kiểm tra xem có đủ phần tử
+            question_id = int(parts[1])  # Lấy id câu hỏi từ tên trường
+            answers.append({"id": question_id, "answer": value})
 
     # Lưu câu trả lời vào session
     sessions[session_id] = answers
