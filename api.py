@@ -1,74 +1,78 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for
+from flask import Flask, request, jsonify, render_template_string
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
-# Lưu trữ tạm thời câu trả lời (có thể thay bằng database)
-answers_storage = {}
+# Dữ liệu giả lập (có thể thay bằng database hoặc hệ thống lưu trữ khác)
+sessions = {}  # Dùng để lưu trữ câu trả lời của từng session
 
-# Endpoint 1: Nhận bộ câu hỏi từ lập trình viên web
+
+# Endpoint 1: Nhận bộ câu hỏi từ web test và tạo form
 @app.route('/questions', methods=['POST'])
 def send_questions():
     data = request.json
     questions = data.get('questions', [])
 
-    # Tạo URL trả về form để người dùng trả lời
-    session_id = "abc123"  # Tạo session_id ngẫu nhiên hoặc sử dụng UUID
-    form_url = f"https://api-zyh1.onrender.com/form/{session_id}"
+    # Tạo session_id ngẫu nhiên hoặc sử dụng UUID
+    session_id = "abc123"  # Giả lập session_id
+    sessions[session_id] = {}
 
-    # Lưu bộ câu hỏi vào storage
-    answers_storage[session_id] = {"questions": questions, "answers": []}
+    # Tạo HTML form từ câu hỏi
+    form_html = f'''
+    <html>
+    <head><title>Answer the Questions</title></head>
+    <body>
+        <h1>Answer the Questions</h1>
+        <form action="/submit_answers/{{ session_id }}" method="POST">
+    '''
+
+    for q in questions:
+        form_html += f'<label>{q["question"]}</label><br>'
+        form_html += f'<input type="text" name="question_{q["id"]}" required><br><br>'
+
+    form_html += '''
+        <button type="submit">Submit Answers</button>
+        </form>
+    </body>
+    </html>
+    '''
 
     return jsonify({
         "status": "success",
         "session_id": session_id,
-        "form_url": form_url
+        "form_html": form_html
     })
 
 
-# Endpoint 3: Hiển thị form trả lời
-@app.route('/form/<session_id>', methods=['GET', 'POST'])
-def form_page(session_id):
-    if request.method == 'POST':
-        # Lấy câu trả lời từ form
-        answers = request.form.getlist('answers')
-        stored_data = answers_storage.get(session_id)
+# Endpoint 2: Nhận và lưu câu trả lời của người dùng
+@app.route('/submit_answers/<session_id>', methods=['POST'])
+def submit_answers(session_id):
+    # Kiểm tra các giá trị gửi đến từ form
+    answers = []
+    for key, value in request.form.items():
+        question_id = int(key.split("_")[1])  # Lấy id câu hỏi từ tên trường
+        answers.append({"id": question_id, "answer": value})
 
-        if stored_data:
-            # Lưu câu trả lời vào storage
-            for i, answer in enumerate(answers):
-                stored_data['answers'].append({
-                    "id": stored_data["questions"][i]["id"],
-                    "answer": answer
-                })
+    # Lưu câu trả lời vào session
+    sessions[session_id] = answers
 
-            return redirect(url_for('thank_you'))  # Chuyển đến trang cảm ơn
-
-    # Lấy câu hỏi từ storage
-    stored_data = answers_storage.get(session_id)
-    if not stored_data:
-        return "Session not found", 404
-
-    questions = stored_data['questions']
-    return render_template('form.html', questions=questions, session_id=session_id)
-
-
-# Endpoint 4: Trang cảm ơn
-@app.route('/thank-you', methods=['GET'])
-def thank_you():
-    return "<h1>Thank you for your answers!</h1>"
-
-
-# Endpoint 2: Trả lời bộ câu hỏi
-@app.route('/answers/<session_id>', methods=['GET'])
-def get_answers(session_id):
-    stored_data = answers_storage.get(session_id)
-    if not stored_data:
-        return jsonify({"status": "error", "message": "Session not found"}), 404
-
+    # Trả lại câu trả lời cho web test
     return jsonify({
         "status": "completed",
         "session_id": session_id,
-        "answers": stored_data["answers"]
+        "answers": answers
+    })
+
+
+# Endpoint 3: Lấy câu trả lời của người dùng từ session
+@app.route('/answers/<session_id>', methods=['GET'])
+def get_answers(session_id):
+    answers = sessions.get(session_id, [])
+    return jsonify({
+        "status": "completed",
+        "session_id": session_id,
+        "answers": answers
     })
 
 
