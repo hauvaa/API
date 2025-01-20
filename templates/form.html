@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Answer Questions</title>
+</head>
+<body>
+    <h1>Answer Questions</h1>
+    <form method="POST">
+        {% for question in questions %}
+            <div>
+                <label for="question-{{ question.id }}">{{ question.question }}</label>
+                <input type="text" id="question-{{ question.id }}" name="answers" required>
+            </div>
+        {% endfor %}
+        <button type="submit">Submit Answers</button>
+    </form>
+</body>
+</html>
