@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Trang chủ</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+</head>
+<body>
+    <h1>Chào mừng!</h1>
+
+    <form method="POST" action="/create_project">
+        <button type="submit">Tạo API key</button>
+    </form>
+
+    <!-- Nút Đăng Xuất -->
+    <form action="{{ url_for('logout') }}" method="GET">
+        <button type="submit">Đăng xuất</button>
+    </form>
+
+    <!-- Nút Kiểm soát các API keys -->
+    <form action="{{ url_for('view_api_keys') }}" method="GET">
+        <button type="submit">Quản lý API keys</button>
+    </form>
+
+    {% if api_keys %}
+        <div class="api-key-list">
+            <h2>Các API keys hiện có:</h2>
+            <ul>
+                {% for api_key in api_keys %}
+                    <li class="api-key-item">{{ api_key }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% elif message %}
+        <p class="message">{{ message }}</p>
+    {% endif %}
+</body>
+</html>

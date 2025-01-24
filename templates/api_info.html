@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Thông tin API</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/api_info.css') }}">
+</head>
+<body>
+    <h1>API Key của bạn:</h1>
+    <p>{{ api_key }}</p>
+    <p>Sử dụng API của bạn bằng cách gửi request kèm header <code>x-api-key</code>.</p>
+</body>
+</html>
