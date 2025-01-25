@@ -12,7 +12,6 @@ CORS(app)
 
 DATABASE = 'database.db'
 
-
 # Helper: Kết nối database
 def get_db_connection():
     conn = sqlite3.connect(DATABASE)
