@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <title>Trang chủ</title>
@@ -12,14 +12,16 @@
         <button type="submit">Tạo API key</button>
     </form>
 
-    <!-- Nút Đăng Xuất -->
     <form action="{{ url_for('logout') }}" method="GET">
         <button type="submit">Đăng xuất</button>
     </form>
 
-    <!-- Nút Kiểm soát các API keys -->
     <form action="{{ url_for('view_api_keys') }}" method="GET">
         <button type="submit">Quản lý API keys</button>
+    </form>
+
+    <form action="{{ url_for('api_docs') }}" method="GET">
+        <button type="submit">Hướng dẫn sử dụng</button>
     </form>
 
     {% if api_keys %}

@@ -5,6 +5,7 @@ import secrets
 from flask_cors import CORS
 import os
 import uuid  # Để tạo session_id duy nhất
+import json
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'default_secret_key')
@@ -113,109 +114,90 @@ def create_project():
 def send_questions():
     api_key = request.headers.get('x-api-key')
     conn = get_db_connection()
-    key_exists = conn.execute("SELECT * FROM api_keys WHERE api_key = ?", (api_key,)).fetchone()
 
+    # Kiểm tra xem api_key có hợp lệ không
+    key_exists = conn.execute("SELECT * FROM api_keys WHERE api_key = ?", (api_key,)).fetchone()
     if not key_exists:
         conn.close()
         return jsonify({"error": "Invalid API key"}), 403
 
-    # Lấy thông tin bộ câu hỏi
-    data = request.json
-    questions = data.get('questions', [])
+    # Nhận bộ câu hỏi từ request
+    questions = request.get_json()
 
+    # Kiểm tra nếu không có câu hỏi
+    if not questions:
+        conn.close()
+        return jsonify({"error": "No questions provided"}), 400
+
+    # Tạo client_id cho phiên chơi
     client_id = str(uuid.uuid4())
 
-    # Lưu thông tin vào bảng client_sessions
+    # Kiểm tra và lưu câu hỏi vào bảng questions
+    for question in questions:
+        question_id = question['id']
+        question_text = question['question']
+
+        # Kiểm tra xem câu hỏi đã tồn tại chưa
+        existing_question = conn.execute(
+            "SELECT * FROM questions WHERE api_key = ? AND id = ? AND question = ?",
+            (api_key, question_id, question_text)
+        ).fetchone()
+
+        if not existing_question:
+            conn.execute(
+                "INSERT INTO questions (api_key, id, question) VALUES (?, ?, ?)",
+                (api_key, question_id, question_text)
+            )
+
+    conn.commit()
+
+    # Lưu session vào bảng client_sessions
     conn.execute("INSERT INTO client_sessions (client_id, api_key) VALUES (?, ?)", (client_id, api_key))
     conn.commit()
     conn.close()
 
-    # Tạo form HTML
-    form_html = '''
-    <html>
-    <head><title>Answer the Questions</title></head>
-    <body>
-        <h1>Answer the Questions</h1>
-        <form id="answerForm" onsubmit="submitAnswers(event)">
-    '''
+    # Trả lại đường link game cho khách hàng
+    game_url = url_for('game_page', client_id=client_id, _external=True)
 
-    for q in questions:
-        form_html += f'''
-        <label>{q["question"]}</label><br>
-        <input type="text" name="question_{q["id"]}" required><br><br>
-        '''
+    return jsonify({"game_url": game_url, "client_id": client_id})
 
-    form_html += '''
-            <button type="submit">Submit Answers</button>
-        </form>
-    </body>
-    </html>
-    '''
+@app.route('/game')
+def game_page():
+    client_id = request.args.get('client_id', '')
 
-    # Trả về client_id và form
-    return jsonify({"form_html": form_html, "client_id": client_id})
-
-# Route: Submit answers
-@app.route('/api/submit_answers/<client_id>', methods=['POST'])
-def submit_answers(client_id):
-    api_key = request.headers.get('x-api-key')
+    # Kết nối vào cơ sở dữ liệu
     conn = get_db_connection()
 
-    # Kiểm tra API key hợp lệ
-    key_exists = conn.execute("SELECT * FROM api_keys WHERE api_key = ?", (api_key,)).fetchone()
-    if not key_exists:
+    # Kiểm tra session và lấy api_key
+    session = conn.execute("SELECT api_key FROM client_sessions WHERE client_id = ?", (client_id,)).fetchone()
+    if not session:
         conn.close()
-        return jsonify({"error": "Invalid API key"}), 403
+        return "Session không hợp lệ", 400
 
-    # Kiểm tra client_id hợp lệ
-    client_session = conn.execute("SELECT * FROM client_sessions WHERE client_id = ?", (client_id,)).fetchone()
-    if not client_session:
-        conn.close()
-        return jsonify({"error": "Invalid client ID"}), 403
+    api_key = session["api_key"]
 
-    # Lấy câu trả lời từ request
-    data = request.json
-    try:
-        # Lưu câu trả lời vào database
-        for question_id, answer in data.items():
-            conn.execute("INSERT INTO answers (client_id, question_id, answer) VALUES (?, ?, ?)",
-                         (client_id, question_id, answer))
-        conn.commit()
-    except Exception as e:
-        conn.close()
-        return jsonify({"error": "Failed to save answers"}), 500
+    # Lấy câu hỏi từ bảng questions theo api_key
+    questions = conn.execute("SELECT id, question FROM questions WHERE api_key = ?", (api_key,)).fetchall()
 
-    conn.close()
-    return jsonify({"status": "completed"})
-
-# Route: Get answers
-@app.route('/api/answers/<client_id>', methods=['GET'])
-def get_answers(client_id):
-    api_key = request.headers.get('x-api-key')
-    conn = get_db_connection()
-
-    # Kiểm tra API key hợp lệ
-    key_exists = conn.execute("SELECT * FROM api_keys WHERE api_key = ?", (api_key,)).fetchone()
-    if not key_exists:
-        conn.close()
-        return jsonify({"error": "Invalid API key"}), 403
-
-    # Kiểm tra client_id hợp lệ
-    client_session = conn.execute("SELECT * FROM client_sessions WHERE client_id = ?", (client_id,)).fetchone()
-    if not client_session:
-        conn.close()
-        return jsonify({"error": "Invalid client ID"}), 403
-
-    # Lấy câu trả lời từ database
-    answers = conn.execute("SELECT question_id, answer FROM answers WHERE client_id = ?", (client_id,)).fetchall()
+    # Đóng kết nối cơ sở dữ liệu
     conn.close()
 
-    if not answers:
-        return jsonify({"status": "no_answers"}), 404
+    # Chuyển đổi câu hỏi thành danh sách các từ điển
+    questions_list = [dict(row) for row in questions]
 
-    # Trả về danh sách câu trả lời
-    answers_list = [{"id": row["question_id"], "answer": row["answer"]} for row in answers]
-    return jsonify({"status": "completed", "answers": answers_list})
+    # Kiểm tra câu hỏi trước khi trả về
+    print("Questions from DB:", questions_list)
+    print(json.dumps(questions_list))
+
+    # Trả lại câu hỏi cho game
+    if questions_list:
+        return render_template('index.html', client_id=client_id, api_key=api_key, questions=questions_list)
+    else:
+        return "Không có câu hỏi", 400
+
+@app.route('/api_docs')
+def api_docs():
+    return render_template('api_docs.html')  # Trang hướng dẫn API
 
 
 if __name__ == '__main__':

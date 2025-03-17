@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hướng Dẫn Sử Dụng API</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        h1, h2 { color: #333; }
+        pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow: auto; }
+        .error { color: red; }
+        .success { color: green; }
+        .note { font-weight: bold; color: red; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .button-container { text-align: center; margin: 20px 0; }
+        .code-block { background: #f9f9f9; border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Hướng Dẫn Sử Dụng API</h1>
+
+        <h2>1. Tạo API Key</h2>
+        <p>Truy cập vào trang quản trị của bạn để tạo API key cần thiết cho việc sử dụng API.</p>
+        <p>Sau khi tạo API key, lưu trữ nó một cách an toàn vì bạn sẽ cần nó để xác thực các yêu cầu API.</p>
+        <p>Bạn có thể xem lại các API key mà bạn đã tạo ra trong phần Quản lý API Keys ở trang chủ.</p>
+        <p>Bạn sẽ sử dụng API key của mình kết hợp với đường dẫn <code>https://api-keva.onrender.com</code> và endpoint <code>/api/questions</code> để gọi tới API.</p>
+
+        <h2>2. Tạo file script</h2>
+        <p>Tạo một file script trong trang web của bạn, ví dụ: <code>script.js</code>. Thực hiện các bước tiếp theo để sử dụng API.</p>
+
+        <h2>3. Gửi câu hỏi</h2>
+        <p>Sử dụng endpoint <code>/api/questions</code> để gửi danh sách câu hỏi. Các bước chi tiết như sau:</p>
+        <div class="code-block">
+            <pre>
+function sendQuestions() {
+    // Bước 1: Tạo bộ câu hỏi
+    const questions = [
+        { id: 1, question: "What is your name?" },
+        { id: 2, question: "What is your phone number?" },
+        { id: 3, question: "What is your email?" }
+    ];
+
+    console.log("Câu hỏi gửi đi:", questions);  // Log câu hỏi để kiểm tra
+
+    // Bước 2: Sử dụng fetch để gửi yêu cầu POST tới endpoint
+    fetch("https://api-keva.onrender.com/api/questions", {
+        method: "POST",  // Phương thức gọi là POST
+        headers: {
+            "Content-Type": "application/json",  // Header xác định kiểu dữ liệu là JSON
+            "x-api-key": "YOUR_API_KEY"  // Header xác định API key
+        },
+        body: JSON.stringify({ questions })  // Chuyển đổi bộ câu hỏi thành chuỗi JSON để gửi đi
+    })
+    .then(response => response.json())  // Chuyển đổi phản hồi thành đối tượng JSON
+    .then(data => {
+        if (data.game_url && data.client_id) {
+            console.log("Game URL nhận được:", data.game_url);  // Log URL game
+
+            // Bước 3: Nhúng game vào trang web dưới dạng iframe
+            document.getElementById("game-container").innerHTML = `
+                &lt;iframe id="gameFrame" src="${data.game_url}" frameborder="0"&gt;&lt;/iframe&gt;
+            `;
+        } else {
+            console.log("Lỗi từ server:", data.error);
+            document.getElementById("result").innerHTML = `<span class="error">Lỗi: ${data.error}</span>`;
+        }
+    })
+    .catch(error => {
+        console.error("Lỗi khi gửi câu hỏi:", error);
+        document.getElementById("result").innerHTML = `<span class="error">Lỗi khi gửi câu hỏi. Vui lòng thử lại.</span>`;
+    });
+}
+            </pre>
+        </div>
+
+        <h2>4. Lắng nghe sự kiện từ game Unity gửi về</h2>
+        <p>Để lắng nghe sự kiện từ game Unity gửi về, bạn cần thực hiện các bước sau:</p>
+        <div class="code-block">
+            <pre>
+// Bước 1: Lắng nghe sự kiện message từ window
+window.addEventListener("message", function(event) {
+    if (event.data && event.data.type === "GameAnswersReceived") {
+        console.log("Web khách hàng nhận được câu trả lời từ game:", event.data.answers);
+
+        // Bước 2: Gọi hàm displayAnswers để hiển thị kết quả trên giao diện
+        displayAnswers(event.data.answers);
+
+        // Bước 3: Lưu kết quả vào database nếu không muốn hiển thị ra giao diện
+        saveAnswersToDatabase(event.data.answers);
+    }
+});
+
+// Bước 2: Hàm hiển thị danh sách câu trả lời từ game
+function displayAnswers(data) {
+    const answersContainer = document.getElementById("answers-container");
+    const answersList = document.getElementById("answers-list");
+
+    // Kiểm tra xem data có thuộc tính answers là một mảng không
+    if (!data.answers || !Array.isArray(data.answers)) {
+        console.error("Dữ liệu nhận được không hợp lệ hoặc không phải là mảng:", data);
+        return;
+    }
+
+    // Lấy mảng answers từ đối tượng data
+    const answers = data.answers;
+
+    // Xóa nội dung cũ trước khi cập nhật mới
+    answersList.innerHTML = "";
+
+    // Duyệt qua danh sách câu trả lời và thêm vào danh sách hiển thị
+    answers.forEach(answer => {
+        const response = answer.split(': ')[1]; // Lấy phần câu trả lời sau dấu ":"
+        const listItem = document.createElement("li");
+        listItem.innerHTML = `${response}`;
+        answersList.appendChild(listItem);
+    });
+
+    // Hiển thị khu vực kết quả
+    answersContainer.style.display = "block";
+}
+
+// Bước 3: Hàm lưu trữ câu trả lời vào database
+function saveAnswersToDatabase(answers) {
+    fetch("https://your-database-endpoint.com/saveAnswers", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "x-api-key": "YOUR_DATABASE_API_KEY"
+        },
+        body: JSON.stringify({ answers })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log("Kết quả đã được lưu vào database thành công.");
+        } else {
+            console.error("Lỗi khi lưu kết quả vào database:", data.error);
+        }
+    })
+    .catch(error => {
+        console.error("Lỗi khi lưu kết quả vào database:", error);
+    });
+}
+            </pre>
+        </div>
+
+        <h2>5. Hiển thị hoặc lưu trữ kết quả</h2>
+        <p>Khi nhận được câu trả lời từ game, bạn có thể sử dụng hàm <code>displayAnswers</code> để hiển thị kết quả trên giao diện người dùng.</p>
+        <p>Nếu bạn không muốn hiển thị, bạn có thể xử lý để lưu trữ các câu trả lời vào database hoặc tùy theo cách bạn muốn sử dụng nó.</p>
+        <p class="note">Lưu ý: Trong một phiên làm việc, nếu bạn nhận được câu trả lời từ Unity nhưng không lưu trữ lại, các câu trả lời có thể sẽ bị mất.</p>
+
+        <h2>6. Ví dụ về file HTML</h2>
+        <p>Dưới đây là một ví dụ về file HTML sử dụng các đoạn mã trên để gửi câu hỏi, nhúng game và hiển thị kết quả:</p>
+        <div class="code-block">
+            <pre>
+&lt;!DOCTYPE html&gt;
+&lt;html lang="vi"&gt;
+&lt;head&gt;
+    &lt;meta charset="UTF-8"&gt;
+    &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+    &lt;title&gt;Test API & Load Game&lt;/title&gt;
+    &lt;link rel="stylesheet" href="style.css"&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;h1&gt;Test API & Load Game&lt;/h1&gt;
+
+    &lt;div style="text-align: center;"&gt;
+        &lt;button onclick="sendQuestions()"&gt;Load Game&lt;/button&gt;
+    &lt;/div&gt;
+    &lt;!-- Khu vực hiển thị game --&gt;
+    &lt;div id="game-container" style="margin-top: 20px;"&gt;&lt;/div&gt;
+
+    &lt;!-- Khu vực hiển thị câu trả lời từ game --&gt;
+    &lt;div id="answers-container" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; display: none;"&gt;
+        &lt;h2&gt;Kết quả trả lời từ Game&lt;/h2&gt;
+        &lt;ul id="answers-list"&gt;&lt;/ul&gt;
+    &lt;/div&gt;
+
+    &lt;script src="script.js"&gt;&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+            </pre>
+        </div>
+    </div>
+</body>
+</html>
