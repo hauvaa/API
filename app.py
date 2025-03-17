@@ -132,7 +132,7 @@ def send_questions():
     # Tạo client_id cho phiên chơi
     client_id = str(uuid.uuid4())
 
-    # Kiểm tra và lưu câu hỏi vào bảng questions
+    # Kiểm tra và lưu câu hỏi vào bảng questions và session_questions
     for question in questions:
         question_id = question['id']
         question_text = question['question']
@@ -148,6 +148,12 @@ def send_questions():
                 "INSERT INTO questions (api_key, id, question) VALUES (?, ?, ?)",
                 (api_key, question_id, question_text)
             )
+
+        # Lưu câu hỏi vào bảng session_questions
+        conn.execute(
+            "INSERT INTO session_questions (client_id, question_id, question) VALUES (?, ?, ?)",
+            (client_id, question_id, question_text)
+        )
 
     conn.commit()
 
@@ -176,8 +182,8 @@ def game_page():
 
     api_key = session["api_key"]
 
-    # Lấy câu hỏi từ bảng questions theo api_key
-    questions = conn.execute("SELECT id, question FROM questions WHERE api_key = ?", (api_key,)).fetchall()
+    # Lấy câu hỏi từ bảng session_questions theo client_id
+    questions = conn.execute("SELECT question_id as id, question FROM session_questions WHERE client_id = ?", (client_id,)).fetchall()
 
     # Đóng kết nối cơ sở dữ liệu
     conn.close()
